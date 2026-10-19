@@ -5,24 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>yeroshen.com</title>
 <meta name="description" content="Скоро здесь будет портфолио">
-<meta name="theme-color" content="#0d0d0f">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='16' cy='34' r='9' fill='none' stroke='%23ffd23f' stroke-width='6'/%3E%3Ccircle cx='31' cy='48' r='4' fill='%23ffd23f'/%3E%3Ccircle cx='46' cy='30' r='14' fill='none' stroke='%23ffd23f' stroke-width='7'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#050608">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230b0b0c'/%3E%3Ccircle cx='17' cy='34' r='8' fill='none' stroke='%231f5eff' stroke-width='4'/%3E%3Crect x='26' y='43' width='11' height='3.5' fill='%231f5eff'/%3E%3Cellipse cx='45' cy='29' rx='10' ry='12' fill='none' stroke='%231f5eff' stroke-width='4.5'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d0d0f;
-    --fg: #f4f1ea;
-    --muted: #8a877f;
-    --accent: #ffd23f;
+    --bg: #050608;
+    --blue: #1f5eff;
+    --fg: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    background: var(--bg);
+    background:
+      radial-gradient(120% 75% at 50% 115%, #2a63ff 0%, #1646d6 28%, #0b2167 52%, #060914 76%, var(--bg) 100%),
+      var(--bg);
     color: var(--fg);
-    font-family: "Manrope", system-ui, sans-serif;
+    font-family: "Onest", system-ui, sans-serif;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
   }
@@ -36,42 +38,64 @@
     touch-action: none;
   }
   #scene:active { cursor: grabbing; }
+  .mark {
+    position: fixed;
+    width: 22px;
+    height: 22px;
+    color: var(--blue);
+    pointer-events: none;
+  }
+  .mark.tl { top: 24px; left: 24px; }
+  .mark.tr { top: 24px; right: 24px; }
+  .mark.bl { bottom: 24px; left: 24px; }
+  .mark.br { bottom: 24px; right: 24px; }
   .fallback {
     position: fixed;
     inset: 0;
     display: none;
     place-items: center;
-    font-size: clamp(96px, 28vw, 320px);
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: -0.04em;
+    font-size: clamp(96px, 26vw, 300px);
+    font-weight: 500;
+    color: var(--blue);
   }
   .no-webgl .fallback { display: grid; }
   .caption {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: max(32px, env(safe-area-inset-bottom));
+    bottom: max(56px, env(safe-area-inset-bottom));
     padding: 0 16px;
     text-align: center;
     pointer-events: none;
   }
   .caption h1 {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
+    font-size: clamp(20px, 2.4vw, 28px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
   .caption p {
     margin-top: 6px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: clamp(14px, 1.4vw, 17px);
+    font-weight: 400;
     color: var(--muted);
   }
 </style>
 </head>
 <body>
-<canvas id="scene" aria-label="Трёхмерный смайлик o.O"></canvas>
-<div class="fallback" aria-hidden="true">o.O</div>
+<canvas id="scene" aria-label="Трёхмерный смайлик o_O"></canvas>
+<div class="fallback" aria-hidden="true">o_O</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="reg" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.2">
+    <circle cx="11" cy="11" r="5"/>
+    <path d="M1 1 21 21M21 1 1 21"/>
+  </symbol>
+</svg>
+<svg class="mark tl" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark tr" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark bl" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark br" aria-hidden="true"><use href="#reg"/></svg>
+
 <div class="caption">
   <h1>yeroshen.com</h1>
   <p>Скоро здесь будет портфолио</p>
@@ -85,97 +109,131 @@
 </script>
 <script type="module">
 import * as THREE from "three";
-import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const canvas = document.getElementById("scene");
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 } catch (e) {
   document.documentElement.classList.add("no-webgl");
   throw e;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
+renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d0d0f);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
 
-const key = new THREE.DirectionalLight(0xffffff, 1.6);
-key.position.set(3, 4, 5);
-scene.add(key);
+// Studio environment: dark top, blue floor glow, a few softboxes —
+// gives the chrome its blue-and-white foil reflections
+function buildEnvironment() {
+  const env = new THREE.Scene();
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(20, 64, 32),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {},
+      vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
+      fragmentShader: `varying vec3 vDir; void main(){
+        float h = vDir.y;
+        vec3 top = vec3(0.06, 0.06, 0.07);
+        vec3 mid = vec3(0.22, 0.23, 0.26);
+        vec3 bot = vec3(0.10, 0.28, 1.1);
+        vec3 c = h > 0. ? mix(mid, top, smoothstep(0., .6, h)) : mix(mid, bot, smoothstep(0., .7, -h));
+        gl_FragColor = vec4(c, 1.);
+      }`,
+    })
+  );
+  env.add(dome);
+  const box = (w, h, x, y, z, intensity) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(intensity), side: THREE.DoubleSide })
+    );
+    m.position.set(x, y, z);
+    m.lookAt(0, 0, 0);
+    env.add(m);
+  };
+  box(10, 3, -6, 8, 6, 3.2);   // key, top-left
+  box(3, 8, 9, 2, 3, 2.2);     // rim, right
+  box(6, 1.5, 0, 3, 10, 1.4);  // front strip
+  box(2, 6, -10, -1, -4, 1.2); // back-left kicker
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  return pmrem.fromScene(env, 0.02).texture;
+}
+scene.environment = buildEnvironment();
 
-const material = new THREE.MeshPhysicalMaterial({
-  color: 0xffb800,
-  roughness: 0.18,
-  metalness: 0,
-  clearcoat: 1,
-  clearcoatRoughness: 0.08,
+const chrome = new THREE.MeshPhysicalMaterial({
+  color: 0xe8eaee,
+  metalness: 1,
+  roughness: 0.1,
+  clearcoat: 0.6,
+  clearcoatRoughness: 0.1,
+  envMapIntensity: 1.25,
 });
 
-// Face: small "o", dot ".", big "O"
+// Foil balloon wrinkles: low-amplitude noise along the normals,
+// plus a squeeze where the seam would be
+function inflate(geo, amp, freq, seamAxis) {
+  const pos = geo.attributes.position;
+  const nrm = geo.attributes.normal;
+  const v = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    n.fromBufferAttribute(nrm, i);
+    const wrinkle =
+      Math.sin(v.x * freq + Math.cos(v.y * freq * 0.7) * 2) *
+      Math.sin(v.y * freq * 1.3 + v.z * 3) * amp +
+      Math.sin((v.x + v.y) * freq * 2.1) * amp * 0.35;
+    const seam = seamAxis ? -Math.exp(-Math.pow(n[seamAxis] * 6, 2)) * amp * 1.6 : 0;
+    v.addScaledVector(n, wrinkle + seam);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 const face = new THREE.Group();
 scene.add(face);
 
-const small = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.2, 48, 96), material);
-small.position.set(-1.75, -0.15, 0);
+const smallGeo = inflate(new THREE.TorusGeometry(0.52, 0.2, 64, 160), 0.0035, 14, "z");
+const bigGeo = inflate(new THREE.TorusGeometry(0.88, 0.27, 72, 200), 0.0045, 11, "z");
+const barGeo = inflate(new THREE.CapsuleGeometry(0.13, 0.72, 24, 48), 0.003, 14, "z");
 
-const dot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 48, 48), material);
-dot.position.set(-0.55, -0.95, 0);
+const small = new THREE.Mesh(smallGeo, chrome);
+const big = new THREE.Mesh(bigGeo, chrome);
+big.scale.set(1, 1.14, 1);
+const bar = new THREE.Mesh(barGeo, chrome);
+bar.rotation.z = Math.PI / 2;
 
-const big = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.3, 64, 128), material);
-big.position.set(1.05, 0.25, 0);
-
-const parts = [small, dot, big];
-parts.forEach((m, i) => {
-  const pivot = new THREE.Group();
-  pivot.position.copy(m.position);
-  m.position.set(0, 0, 0);
-  pivot.add(m);
-  pivot.userData = { base: pivot.position.clone(), phase: i * 1.3 };
-  face.add(pivot);
-});
-const [smallPivot, dotPivot, bigPivot] = face.children;
-
-// Soft contact shadow
-const shadowTex = (() => {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d");
-  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, "rgba(0,0,0,0.55)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 128, 128);
-  return new THREE.CanvasTexture(c);
-})();
-const shadow = new THREE.Mesh(
-  new THREE.PlaneGeometry(6, 1.6),
-  new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })
-);
-shadow.rotation.x = -Math.PI / 2;
-shadow.position.y = -1.9;
-scene.add(shadow);
+function pivotAt(mesh, x, y, phase) {
+  const p = new THREE.Group();
+  p.position.set(x, y, 0);
+  p.add(mesh);
+  p.userData = { baseY: y, phase };
+  face.add(p);
+  return p;
+}
+const smallPivot = pivotAt(small, -1.75, -0.12, 0);
+const barPivot = pivotAt(bar, -0.42, -0.95, 1.3);
+const bigPivot = pivotAt(big, 1.2, 0.28, 2.6);
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   // Keep the whole face (≈ 5 units wide) in view on narrow screens
-  const fitWidth = 5.6 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
-  camera.position.set(0, 0.2, Math.max(8, fitWidth));
-  camera.lookAt(0, -0.1, 0);
+  const fitWidth = 5.8 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  camera.position.set(0, 0.15, Math.max(10.5, fitWidth));
+  camera.lookAt(0, -0.35, 0);
   camera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
 resize();
 
-// Pointer: face looks at the cursor; drag spins it
+// Pointer: face looks at the cursor; drag spins it; click makes the big eye pop
 const target = new THREE.Vector2();
 let dragging = false, lastX = 0, spin = 0, spinVel = 0;
 canvas.addEventListener("pointermove", (e) => {
@@ -195,9 +253,9 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointerup", () => { dragging = false; });
 
-// Blinks and "surprise" pop on click
 let nextBlink = 1.5, blink = 0, surprise = 0;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const amp = reduceMotion ? 0 : 1;
 
 const clock = new THREE.Clock();
 function tick() {
@@ -209,29 +267,29 @@ function tick() {
     spin += spinVel;
     spin *= 0.97;
   }
-  face.rotation.y += (target.x * 0.5 + spin - face.rotation.y) * 0.08;
-  face.rotation.x += (target.y * 0.3 - face.rotation.x) * 0.08;
+  face.rotation.y += (target.x * 0.45 + spin - face.rotation.y) * 0.08;
+  face.rotation.x += (target.y * 0.25 - face.rotation.x) * 0.08;
 
   nextBlink -= dt;
-  if (nextBlink <= 0) { blink = 1; nextBlink = 2 + Math.random() * 3; }
+  if (nextBlink <= 0) { blink = 1; nextBlink = 2.5 + Math.random() * 3; }
   blink = Math.max(0, blink - dt * 6);
   const lid = 1 - Math.sin(blink * Math.PI) * 0.85;
 
   surprise = Math.max(0, surprise - dt * 1.8);
-  const pop = 1 + Math.sin(surprise * Math.PI) * 0.18;
+  const pop = 1 + Math.sin(surprise * Math.PI) * 0.16;
 
-  const amp = reduceMotion ? 0 : 1;
-  face.children.forEach((p) => {
-    const { base, phase } = p.userData;
-    p.position.y = base.y + Math.sin(t * 1.4 + phase) * 0.06 * amp;
-  });
+  for (const p of face.children) {
+    p.position.y = p.userData.baseY + Math.sin(t * 1.3 + p.userData.phase) * 0.05 * amp;
+  }
   smallPivot.scale.set(1, lid, 1);
   bigPivot.scale.set(pop, lid * pop, pop);
-  dotPivot.rotation.z = Math.sin(t * 2) * 0.2 * amp;
-  smallPivot.rotation.z = Math.sin(t * 0.9) * 0.08 * amp;
-  bigPivot.rotation.z = Math.sin(t * 0.7 + 1) * 0.06 * amp;
+  smallPivot.rotation.z = Math.sin(t * 0.9) * 0.06 * amp;
+  bigPivot.rotation.z = Math.sin(t * 0.7 + 1) * 0.05 * amp;
+  barPivot.rotation.z = Math.sin(t * 1.1 + 2) * 0.05 * amp;
+  // Balloons sway a touch around their own vertical axis
+  smallPivot.rotation.y = Math.sin(t * 0.6) * 0.15 * amp;
+  bigPivot.rotation.y = Math.sin(t * 0.5 + 2) * 0.12 * amp;
 
-  shadow.scale.x = 1 + Math.sin(t * 1.4) * 0.03 * amp;
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
