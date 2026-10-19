@@ -350,9 +350,9 @@ const K = 1.3;
 const U = 0.0071;                   // world units per logo unit
 // Centre of each part's bounding box and its size, in logo units
 const parts = {
-  small: { at: [124.5, 225], size: [249, 249] },
-  bar:   { at: [344.6, 413], size: [172.4, 36] },
-  big:   { at: [593, 177.2], size: [349.6, 354.4] },
+  small: { at: [124.5, 225], size: [249, 249], grow: 30 },
+  bar:   { at: [344.6, 413], size: [172.4, 36], grow: 0 },
+  big:   { at: [593, 177.2], size: [349.6, 354.4], grow: 34 },
 };
 const PAD = 40;
 
@@ -366,6 +366,8 @@ Object.entries(parts).forEach(([name, p], i) => {
     c.translate(x - p.at[0] * K, y - p.at[1] * K);
     c.scale(K, K);
     c.fill(path);
+    // Thicken the eye rings: stroking the outline grows it evenly on both sides
+    if (p.grow) { c.lineWidth = p.grow; c.lineJoin = "round"; c.stroke(path); }
   }, 5);
   const mesh = new THREE.Mesh(balloonShape(sdf, { scale: U / K, seed: i * 1.7 }), chrome);
   const pivot = new THREE.Group();
