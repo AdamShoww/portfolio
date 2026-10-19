@@ -138,9 +138,9 @@ function buildEnvironment() {
       vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
       fragmentShader: `varying vec3 vDir; void main(){
         float h = vDir.y;
-        vec3 top = vec3(0.015, 0.015, 0.02);
-        vec3 mid = vec3(0.13, 0.135, 0.15);
-        vec3 bot = vec3(0.10, 0.24, 1.0);
+        vec3 top = vec3(0.01, 0.01, 0.012);
+        vec3 mid = vec3(0.06, 0.062, 0.07);
+        vec3 bot = vec3(0.14, 0.14, 0.15);
         vec3 c = h > 0. ? mix(mid, top, smoothstep(0., .5, h)) : mix(mid, bot, smoothstep(0.05, .55, -h));
         gl_FragColor = vec4(c, 1.);
       }`,
@@ -162,133 +162,215 @@ function buildEnvironment() {
   strip(0.6, 10, -9, 0, 6, 2.5);  // thin left strip
   strip(8, 0.5, 0, 4, 11, 3);     // front top line
   strip(3, 3, 6, 6, -8, 2);       // back-right
+  strip(2.5, 1.6, 5, 3, 9, 4);    // small window, front-right
+  strip(1.6, 2.4, -6, -2, 8, 3);  // small window, low-left
+  strip(10, 0.35, 0, -3, 9, 2.5); // low horizontal line
   const pmrem = new THREE.PMREMGenerator(renderer);
   return pmrem.fromScene(env, 0).texture;
 }
 scene.environment = buildEnvironment();
 
 const chrome = new THREE.MeshPhysicalMaterial({
-  color: 0xf2f3f6,
+  color: 0xd9dade,
   metalness: 1,
-  roughness: 0.07,
+  roughness: 0.05,
   envMapIntensity: 1.15,
 });
 
-// Foil balloons are two flat sheets welded along the outline: puffy faces,
-// a thin crimped lip at the seam, and pleats where the film bunches up near it
-function foilShape(sv, cv, pleatPhase, seed) {
-  const seamDist = Math.abs(sv);
-  const near = Math.exp(-Math.pow(seamDist / 0.32, 2));
-  const pleat = near * (
-    0.6 * Math.sin(pleatPhase + 1.7 * Math.sin(pleatPhase * 0.11 + seed)) +
-    0.4 * Math.sin(pleatPhase * 1.93 + seed * 2.3)
-  );
-  const lip = Math.exp(-Math.pow(seamDist / 0.06, 2)) * (1 + 0.12 * Math.sin(pleatPhase * 5));
-  const lump = 1 + 0.03 * Math.sin(pleatPhase * 0.17 + seed) * Math.cos(sv * 1.6);
-  return { near, pleat, lip, lump };
-}
+// --- Foil balloon glyphs ---------------------------------------------------
+// A glyph is rasterised, turned into a signed distance field, and inflated:
+// height grows like a circle profile from the outline inwards, so the edge is
+// a welded seam and the faces are puffy. Pleats ripple near the seam.
 
-function finish(geo) {
-  geo.deleteAttribute("uv");
-  geo.deleteAttribute("normal");
-  const merged = mergeVertices(geo, 1e-5);
-  merged.computeVertexNormals();
-  return merged;
-}
-
-// Ring balloon ("o" / "O"): elliptical centreline, flattened cross-section
-function balloonRing({ rx, ry, a, b, pleats, seed }) {
-  const geo = new THREE.TorusGeometry(1, 0.3, 160, 520);
-  const pos = geo.attributes.position, uv = geo.attributes.uv;
-  for (let i = 0; i < pos.count; i++) {
-    const u = uv.getX(i) * Math.PI * 2;
-    const v = uv.getY(i) * Math.PI * 2;
-    const cu = Math.cos(u), su = Math.sin(u);
-    const cv = Math.cos(v), sv = Math.sin(v);
-    let nx = ry * cu, ny = rx * su;
-    const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
-    const f = foilShape(sv, cv, u * pleats, seed);
-    const sgn = cv >= 0 ? 1 : -1;
-    let x = a * sgn * Math.pow(Math.abs(cv), 0.92);
-    x += sgn * a * (-0.07 * f.near + 0.06 * f.pleat + 0.035 * f.lip);
-    let z = b * Math.sign(sv) * Math.pow(Math.abs(sv), 0.85) + sv * b * 0.22 * f.pleat;
-    x *= f.lump; z *= f.lump;
-    pos.setXYZ(i, rx * cu + nx * x, ry * su + ny * x, z);
+const INF = 1e20;
+function edt1d(f, n, d, v, z) {
+  let k = 0;
+  v[0] = 0; z[0] = -INF; z[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      k--;
+      s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    }
+    k++; v[k] = q; z[k] = s; z[k + 1] = INF;
   }
-  return finish(geo);
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++;
+    d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+  }
+}
+// Squared Euclidean distance transform (Felzenszwalb & Huttenlocher)
+function edt(grid, w, h) {
+  const n = Math.max(w, h);
+  const f = new Float64Array(n), d = new Float64Array(n);
+  const v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) f[y] = grid[y * w + x];
+    edt1d(f, h, d, v, z);
+    for (let y = 0; y < h; y++) grid[y * w + x] = d[y];
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) f[x] = grid[y * w + x];
+    edt1d(f, w, d, v, z);
+    for (let x = 0; x < w; x++) grid[y * w + x] = d[x];
+  }
+  return grid;
 }
 
-// Bar balloon ("_"): a pillow inflated from a stadium outline
-function balloonBar({ halfLen, w, b, pleats, seed }) {
-  const nu = 300, nv = 120;
-  const perim = 4 * halfLen + 2 * Math.PI * w;
-  const outline = (t) => {
-    let d = t * perim;
-    if (d < 2 * halfLen) return [halfLen - d, w, 0, 1];
-    d -= 2 * halfLen;
-    if (d < Math.PI * w) { const ang = Math.PI / 2 + d / w; return [-halfLen + Math.cos(ang) * w, Math.sin(ang) * w, Math.cos(ang), Math.sin(ang)]; }
-    d -= Math.PI * w;
-    if (d < 2 * halfLen) return [-halfLen + d, -w, 0, -1];
-    d -= 2 * halfLen;
-    const ang = -Math.PI / 2 + d / w;
-    return [halfLen + Math.cos(ang) * w, Math.sin(ang) * w, Math.cos(ang), Math.sin(ang)];
+function shapeSDF(w, h, draw, blurPx) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.filter = `blur(${blurPx}px)`;  // rounds the corners like an inflated outline
+  ctx.fillStyle = ctx.strokeStyle = "#fff";
+  draw(ctx, w / 2, h / 2);
+  const alpha = ctx.getImageData(0, 0, w, h).data;
+  const toIn = new Float64Array(w * h), toOut = new Float64Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const inside = alpha[i * 4 + 3] > 127;
+    toIn[i] = inside ? 0 : INF;
+    toOut[i] = inside ? INF : 0;
+  }
+  edt(toIn, w, h); edt(toOut, w, h);
+  const sd = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    sd[i] = toOut[i] > 0 ? Math.sqrt(toOut[i]) - 0.5 : -(Math.sqrt(toIn[i]) - 0.5);
+  }
+  return { sd, w, h };
+}
+
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+function balloonShape({ sd, w, h }, { scale, step = 2, seed = 0 }) {
+  const at = (x, y) => {
+    x = Math.max(0, Math.min(w - 1.001, x)); y = Math.max(0, Math.min(h - 1.001, y));
+    const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0;
+    const i = y0 * w + x0;
+    return (sd[i] * (1 - fx) + sd[i + 1] * fx) * (1 - fy) + (sd[i + w] * (1 - fx) + sd[i + w + 1] * fx) * fy;
   };
-  const verts = [], idx = [];
-  for (let j = 0; j < nu; j++) {
-    const t = j / nu;
-    const [ox, oy, dx, dy] = outline(t);
-    const ax = Math.max(-halfLen, Math.min(halfLen, ox));
-    for (let k = 0; k <= nv; k++) {
-      const v = -Math.PI / 2 + (k / nv) * Math.PI;
-      const cv = Math.cos(v), sv = Math.sin(v);
-      const f = foilShape(sv, cv, t * perim * pleats, seed);
-      let r = w * Math.pow(cv, 0.92);
-      r += w * (-0.06 * f.near + 0.035 * f.pleat + 0.035 * f.lip);
-      const z = (b * Math.sign(sv) * Math.pow(Math.abs(sv), 0.85) + sv * b * 0.12 * f.pleat) * f.lump;
-      verts.push(ax + dx * r * f.lump, dy * r * f.lump, z);
+  let maxD = 0;
+  for (let i = 0; i < sd.length; i++) maxD = Math.max(maxD, sd[i]);
+  const D = maxD * 0.92;            // half stroke width, px
+  const puff = 0.95;                // thickness relative to stroke width
+  const pleatK = (Math.PI * 2) / (D * 1.1);
+
+  const nx = Math.ceil(w / step), ny = Math.ceil(h / step);
+  const cols = nx + 1;
+  const sdv = new Float32Array(cols * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) sdv[j * cols + i] = at(i * step, j * step);
+  const used = new Uint8Array(cols * (ny + 1));
+  const cells = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = j * cols + i, b = a + 1, d = a + cols, c = d + 1;
+    if (sdv[a] > 0 || sdv[b] > 0 || sdv[c] > 0 || sdv[d] > 0) {
+      cells.push(a, b, c, d);
+      used[a] = used[b] = used[c] = used[d] = 1;
     }
   }
-  for (let j = 0; j < nu; j++) {
-    const j2 = (j + 1) % nu;
-    for (let k = 0; k < nv; k++) {
-      const a0 = j * (nv + 1) + k, a1 = j2 * (nv + 1) + k;
-      idx.push(a0, a1, a0 + 1, a1, a1 + 1, a0 + 1);
+
+  const front = new Map();
+  const verts = [];
+  const cx = w / 2, cy = h / 2;
+  const px2 = new Float32Array(used.length * 2), sv = new Float32Array(used.length);
+  const hv = new Float32Array(used.length), along = new Float32Array(used.length);
+  for (let k = 0; k < used.length; k++) {
+    if (!used[k]) continue;
+    let x = (k % cols) * step, y = ((k / cols) | 0) * step;
+    let s = sdv[k];
+    let gx = at(x + 1, y) - at(x - 1, y), gy = at(x, y + 1) - at(x, y - 1);
+    const gl = Math.hypot(gx, gy) || 1; gx /= gl; gy /= gl;
+    if (s < 0) { x -= gx * s; y -= gy * s; s = 0; }  // snap onto the outline
+    const t = s / D;
+    px2[k * 2] = x; px2[k * 2 + 1] = y; sv[k] = s;
+    hv[k] = Math.sqrt(Math.max(0, 1 - Math.pow(1 - Math.min(t, 1), 2)));
+    along[k] = (x * -gy + y * gx) * pleatK;
+  }
+  // Relax the height field so the ridge along the stroke's middle becomes a
+  // soft inflated dome instead of a bevel; the seam stays pinned at zero
+  const tmp = new Float32Array(hv.length);
+  for (let it = 0; it < 7; it++) {
+    for (let k = 0; k < hv.length; k++) {
+      if (!used[k] || sv[k] <= 0) { tmp[k] = hv[k]; continue; }
+      let sum = 0, n = 0;
+      for (const nb of [k - 1, k + 1, k - cols, k + cols]) {
+        if (nb >= 0 && nb < hv.length && used[nb]) { sum += hv[nb]; n++; }
+      }
+      tmp[k] = n ? hv[k] * 0.3 + (sum / n) * 0.7 : hv[k];
     }
+    hv.set(tmp);
+  }
+  for (let k = 0; k < used.length; k++) {
+    if (!used[k]) continue;
+    const t = sv[k] / D;
+    // Sparse sharp creases: short stress lines running in from the seam,
+    // each with its own length and depth, like real foil film
+    const per = along[k] / (Math.PI * 2);
+    const ci = Math.floor(per), local = per - ci;
+    const r1 = hash(ci + seed * 97), r2 = hash(ci * 1.7 + seed * 31);
+    let crease = 0;
+    if (r1 > 0.5) {
+      const len = 0.35 + r2 * 0.6;
+      const across = Math.exp(-Math.pow((local - 0.5) / 0.1, 2));
+      crease = across * (1 - smooth(len * 0.4, len, t)) * (0.5 + 0.5 * r1);
+    }
+    // A shallow groove just inside the outline reads as the welded seam
+    const groove = Math.exp(-Math.pow(t / 0.09, 2)) * 0.18;
+    const zz = D * puff * Math.sqrt(hv[k]) * (1 - 0.16 * crease - groove) * scale;
+    const X = (px2[k * 2] - cx) * scale, Y = -(px2[k * 2 + 1] - cy) * scale;
+    front.set(k, verts.length / 3);
+    verts.push(X, Y, zz);
+  }
+  const frontCount = verts.length / 3;
+  for (let i = 0; i < frontCount; i++) verts.push(verts[i * 3], verts[i * 3 + 1], -verts[i * 3 + 2]);
+
+  const idx = [];
+  for (let q = 0; q < cells.length; q += 4) {
+    const a = front.get(cells[q]), b = front.get(cells[q + 1]), c = front.get(cells[q + 2]), d = front.get(cells[q + 3]);
+    idx.push(a, d, b, b, d, c);
+    idx.push(a + frontCount, b + frontCount, d + frontCount, b + frontCount, c + frontCount, d + frontCount);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
   geo.setIndex(idx);
   const merged = mergeVertices(geo, 1e-5);
   merged.computeVertexNormals();
+  merged.computeBoundingBox();
   return merged;
 }
 
+// The o_O logo, drawn in logo units (viewBox 64×40) at K px per unit
+const K = 14;
+const S = 0.07 / K;                 // world units per px
+const parts = {
+  small: { at: [11.5, 22], size: [29, 29], draw: (c, x, y) => { c.lineWidth = 7 * K; c.beginPath(); c.arc(x, y, 8 * K, 0, Math.PI * 2); c.stroke(); } },
+  bar:   { at: [29, 35.5], size: [19, 12], draw: (c, x, y) => { c.beginPath(); c.roundRect(x - 6.5 * K, y - 3 * K, 13 * K, 6 * K, 3 * K); c.fill(); } },
+  big:   { at: [49, 18], size: [36, 41], draw: (c, x, y) => { c.lineWidth = 8.5 * K; c.beginPath(); c.ellipse(x, y, 11 * K, 13.5 * K, 0, 0, Math.PI * 2); c.stroke(); } },
+};
+
 const face = new THREE.Group();
 scene.add(face);
-
-const small = new THREE.Mesh(balloonRing({ rx: 0.52, ry: 0.52, a: 0.21, b: 0.17, pleats: 16, seed: 0.4 }), chrome);
-const big = new THREE.Mesh(balloonRing({ rx: 0.86, ry: 1.0, a: 0.29, b: 0.22, pleats: 22, seed: 2.1 }), chrome);
-const bar = new THREE.Mesh(balloonBar({ halfLen: 0.36, w: 0.13, b: 0.11, pleats: 14, seed: 1.2 }), chrome);
-
-function pivotAt(mesh, x, y, phase) {
-  const p = new THREE.Group();
-  p.position.set(x, y, 0);
-  p.add(mesh);
-  p.userData = { baseY: y, phase };
-  face.add(p);
-  return p;
-}
-const smallPivot = pivotAt(small, -1.75, -0.12, 0);
-const barPivot = pivotAt(bar, -0.42, -0.95, 1.3);
-const bigPivot = pivotAt(big, 1.2, 0.28, 2.6);
+const pivots = {};
+Object.entries(parts).forEach(([name, p], i) => {
+  const sdf = shapeSDF(Math.round(p.size[0] * K), Math.round(p.size[1] * K), p.draw, 6);
+  const mesh = new THREE.Mesh(balloonShape(sdf, { scale: S, seed: i * 1.7 }), chrome);
+  const pivot = new THREE.Group();
+  pivot.add(mesh);
+  pivot.position.set((p.at[0] - 32) * 0.07, -(p.at[1] - 25) * 0.07, 0);
+  pivot.userData = { baseY: pivot.position.y, phase: i * 1.3 };
+  face.add(pivot);
+  pivots[name] = pivot;
+});
+const faceWidth = 64 * 0.07;
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
-  // Keep the whole face (≈ 5 units wide) in view on narrow screens
-  const fitWidth = 5.8 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
-  camera.position.set(0, 0.15, Math.max(10.5, fitWidth));
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const fitWidth = (faceWidth + 1.2) / (2 * tanHalf * camera.aspect);
+  camera.position.set(0, 0.15, Math.max(8.6, fitWidth));
   camera.lookAt(0, -0.35, 0);
   camera.updateProjectionMatrix();
 }
@@ -297,7 +379,7 @@ resize();
 
 // Pointer: face looks at the cursor; drag spins it; click makes the big eye pop
 const target = new THREE.Vector2();
-let dragging = false, lastX = 0, spin = 0, spinVel = 0;
+let dragging = false, lastX = 0, spin = 0, spinVel = 0, surprise = 0;
 canvas.addEventListener("pointermove", (e) => {
   target.x = (e.clientX / window.innerWidth) * 2 - 1;
   target.y = (e.clientY / window.innerHeight) * 2 - 1;
@@ -315,7 +397,7 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointerup", () => { dragging = false; });
 
-let nextBlink = 1.5, blink = 0, surprise = 0;
+let nextBlink = 1.5, blink = 0;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const amp = reduceMotion ? 0 : 1;
 
@@ -342,15 +424,13 @@ function tick() {
 
   for (const p of face.children) {
     p.position.y = p.userData.baseY + Math.sin(t * 1.3 + p.userData.phase) * 0.05 * amp;
+    p.rotation.y = Math.sin(t * 0.55 + p.userData.phase * 2) * 0.12 * amp;
   }
-  smallPivot.scale.set(1, lid, 1);
-  bigPivot.scale.set(pop, lid * pop, pop);
-  smallPivot.rotation.z = Math.sin(t * 0.9) * 0.06 * amp;
-  bigPivot.rotation.z = Math.sin(t * 0.7 + 1) * 0.05 * amp;
-  barPivot.rotation.z = Math.sin(t * 1.1 + 2) * 0.05 * amp;
-  // Balloons sway a touch around their own vertical axis
-  smallPivot.rotation.y = Math.sin(t * 0.6) * 0.15 * amp;
-  bigPivot.rotation.y = Math.sin(t * 0.5 + 2) * 0.12 * amp;
+  pivots.small.scale.set(1, lid, 1);
+  pivots.big.scale.set(pop, lid * pop, pop);
+  pivots.small.rotation.z = Math.sin(t * 0.9) * 0.06 * amp;
+  pivots.big.rotation.z = Math.sin(t * 0.7 + 1) * 0.05 * amp;
+  pivots.bar.rotation.z = Math.sin(t * 1.1 + 2) * 0.05 * amp;
 
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
