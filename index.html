@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>yeroshen.com</title>
-<meta name="description" content="Скоро здесь будет портфолио">
+<title>vlad.yeroshen.com</title>
+<meta name="description" content="Скоро тут будет что посмотреть">
 <meta name="theme-color" content="#050608">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -97,8 +97,8 @@
 <svg class="mark br" aria-hidden="true"><use href="#reg"/></svg>
 
 <div class="caption">
-  <h1>yeroshen.com</h1>
-  <p>Скоро здесь будет портфолио</p>
+  <h1>vlad.yeroshen.com</h1>
+  <p>Скоро тут будет что посмотреть</p>
 </div>
 
 <script type="importmap">
@@ -412,7 +412,6 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("pointerup", () => { dragging = false; });
 
-let nextBlink = 1.5, blink = 0;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const amp = reduceMotion ? 0 : 1;
 
@@ -429,11 +428,6 @@ function tick() {
   face.rotation.y += (target.x * 0.45 + spin - face.rotation.y) * 0.08;
   face.rotation.x += (target.y * 0.25 - face.rotation.x) * 0.08;
 
-  nextBlink -= dt;
-  if (nextBlink <= 0) { blink = 1; nextBlink = 2.5 + Math.random() * 3; }
-  blink = Math.max(0, blink - dt * 6);
-  const lid = 1 - Math.sin(blink * Math.PI) * 0.85;
-
   surprise = Math.max(0, surprise - dt * 1.8);
   const pop = 1 + Math.sin(surprise * Math.PI) * 0.16;
 
@@ -441,8 +435,7 @@ function tick() {
     p.position.y = p.userData.baseY + Math.sin(t * 1.3 + p.userData.phase) * 0.05 * amp;
     p.rotation.y = Math.sin(t * 0.55 + p.userData.phase * 2) * 0.12 * amp;
   }
-  pivots.small.scale.set(1, lid, 1);
-  pivots.big.scale.set(pop, lid * pop, pop);
+  pivots.big.scale.set(pop, pop, pop);
   pivots.small.rotation.z = Math.sin(t * 0.9) * 0.06 * amp;
   pivots.big.rotation.z = Math.sin(t * 0.7 + 1) * 0.05 * amp;
   pivots.bar.rotation.z = Math.sin(t * 1.1 + 2) * 0.05 * amp;
