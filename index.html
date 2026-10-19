@@ -109,6 +109,7 @@
 </script>
 <script type="module">
 import * as THREE from "three";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 
 const canvas = document.getElementById("scene");
 let renderer;
@@ -126,28 +127,27 @@ renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
 
-// Studio environment: dark top, blue floor glow, a few softboxes —
-// gives the chrome its blue-and-white foil reflections
+// Studio environment: near-black room, a hard blue floor glow and a set of
+// thin white strips — chrome reads as foil only with high-contrast reflections
 function buildEnvironment() {
   const env = new THREE.Scene();
   const dome = new THREE.Mesh(
     new THREE.SphereGeometry(20, 64, 32),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
-      uniforms: {},
       vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
       fragmentShader: `varying vec3 vDir; void main(){
         float h = vDir.y;
-        vec3 top = vec3(0.06, 0.06, 0.07);
-        vec3 mid = vec3(0.22, 0.23, 0.26);
-        vec3 bot = vec3(0.10, 0.28, 1.1);
-        vec3 c = h > 0. ? mix(mid, top, smoothstep(0., .6, h)) : mix(mid, bot, smoothstep(0., .7, -h));
+        vec3 top = vec3(0.015, 0.015, 0.02);
+        vec3 mid = vec3(0.13, 0.135, 0.15);
+        vec3 bot = vec3(0.10, 0.24, 1.0);
+        vec3 c = h > 0. ? mix(mid, top, smoothstep(0., .5, h)) : mix(mid, bot, smoothstep(0.05, .55, -h));
         gl_FragColor = vec4(c, 1.);
       }`,
     })
   );
   env.add(dome);
-  const box = (w, h, x, y, z, intensity) => {
+  const strip = (w, h, x, y, z, intensity) => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(intensity), side: THREE.DoubleSide })
@@ -156,57 +156,119 @@ function buildEnvironment() {
     m.lookAt(0, 0, 0);
     env.add(m);
   };
-  box(10, 3, -6, 8, 6, 3.2);   // key, top-left
-  box(3, 8, 9, 2, 3, 2.2);     // rim, right
-  box(6, 1.5, 0, 3, 10, 1.4);  // front strip
-  box(2, 6, -10, -1, -4, 1.2); // back-left kicker
+  strip(14, 6, 0, 9, 9, 2.2);     // broad soft key, above-front
+  strip(12, 2.2, -4, 9, 5, 5);    // key, top-left
+  strip(1.2, 10, 9, 1, 5, 4);     // tall rim, right
+  strip(0.6, 10, -9, 0, 6, 2.5);  // thin left strip
+  strip(8, 0.5, 0, 4, 11, 3);     // front top line
+  strip(3, 3, 6, 6, -8, 2);       // back-right
   const pmrem = new THREE.PMREMGenerator(renderer);
-  return pmrem.fromScene(env, 0.02).texture;
+  return pmrem.fromScene(env, 0).texture;
 }
 scene.environment = buildEnvironment();
 
 const chrome = new THREE.MeshPhysicalMaterial({
-  color: 0xe8eaee,
+  color: 0xf2f3f6,
   metalness: 1,
-  roughness: 0.1,
-  clearcoat: 0.6,
-  clearcoatRoughness: 0.1,
-  envMapIntensity: 1.25,
+  roughness: 0.07,
+  envMapIntensity: 1.15,
 });
 
-// Foil balloon wrinkles: low-amplitude noise along the normals,
-// plus a squeeze where the seam would be
-function inflate(geo, amp, freq, seamAxis) {
-  const pos = geo.attributes.position;
-  const nrm = geo.attributes.normal;
-  const v = new THREE.Vector3(), n = new THREE.Vector3();
+// Foil balloons are two flat sheets welded along the outline: puffy faces,
+// a thin crimped lip at the seam, and pleats where the film bunches up near it
+function foilShape(sv, cv, pleatPhase, seed) {
+  const seamDist = Math.abs(sv);
+  const near = Math.exp(-Math.pow(seamDist / 0.32, 2));
+  const pleat = near * (
+    0.6 * Math.sin(pleatPhase + 1.7 * Math.sin(pleatPhase * 0.11 + seed)) +
+    0.4 * Math.sin(pleatPhase * 1.93 + seed * 2.3)
+  );
+  const lip = Math.exp(-Math.pow(seamDist / 0.06, 2)) * (1 + 0.12 * Math.sin(pleatPhase * 5));
+  const lump = 1 + 0.03 * Math.sin(pleatPhase * 0.17 + seed) * Math.cos(sv * 1.6);
+  return { near, pleat, lip, lump };
+}
+
+function finish(geo) {
+  geo.deleteAttribute("uv");
+  geo.deleteAttribute("normal");
+  const merged = mergeVertices(geo, 1e-5);
+  merged.computeVertexNormals();
+  return merged;
+}
+
+// Ring balloon ("o" / "O"): elliptical centreline, flattened cross-section
+function balloonRing({ rx, ry, a, b, pleats, seed }) {
+  const geo = new THREE.TorusGeometry(1, 0.3, 160, 520);
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    n.fromBufferAttribute(nrm, i);
-    const wrinkle =
-      Math.sin(v.x * freq + Math.cos(v.y * freq * 0.7) * 2) *
-      Math.sin(v.y * freq * 1.3 + v.z * 3) * amp +
-      Math.sin((v.x + v.y) * freq * 2.1) * amp * 0.35;
-    const seam = seamAxis ? -Math.exp(-Math.pow(n[seamAxis] * 6, 2)) * amp * 1.6 : 0;
-    v.addScaledVector(n, wrinkle + seam);
-    pos.setXYZ(i, v.x, v.y, v.z);
+    const u = uv.getX(i) * Math.PI * 2;
+    const v = uv.getY(i) * Math.PI * 2;
+    const cu = Math.cos(u), su = Math.sin(u);
+    const cv = Math.cos(v), sv = Math.sin(v);
+    let nx = ry * cu, ny = rx * su;
+    const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+    const f = foilShape(sv, cv, u * pleats, seed);
+    const sgn = cv >= 0 ? 1 : -1;
+    let x = a * sgn * Math.pow(Math.abs(cv), 0.92);
+    x += sgn * a * (-0.07 * f.near + 0.06 * f.pleat + 0.035 * f.lip);
+    let z = b * Math.sign(sv) * Math.pow(Math.abs(sv), 0.85) + sv * b * 0.22 * f.pleat;
+    x *= f.lump; z *= f.lump;
+    pos.setXYZ(i, rx * cu + nx * x, ry * su + ny * x, z);
   }
-  geo.computeVertexNormals();
-  return geo;
+  return finish(geo);
+}
+
+// Bar balloon ("_"): a pillow inflated from a stadium outline
+function balloonBar({ halfLen, w, b, pleats, seed }) {
+  const nu = 300, nv = 120;
+  const perim = 4 * halfLen + 2 * Math.PI * w;
+  const outline = (t) => {
+    let d = t * perim;
+    if (d < 2 * halfLen) return [halfLen - d, w, 0, 1];
+    d -= 2 * halfLen;
+    if (d < Math.PI * w) { const ang = Math.PI / 2 + d / w; return [-halfLen + Math.cos(ang) * w, Math.sin(ang) * w, Math.cos(ang), Math.sin(ang)]; }
+    d -= Math.PI * w;
+    if (d < 2 * halfLen) return [-halfLen + d, -w, 0, -1];
+    d -= 2 * halfLen;
+    const ang = -Math.PI / 2 + d / w;
+    return [halfLen + Math.cos(ang) * w, Math.sin(ang) * w, Math.cos(ang), Math.sin(ang)];
+  };
+  const verts = [], idx = [];
+  for (let j = 0; j < nu; j++) {
+    const t = j / nu;
+    const [ox, oy, dx, dy] = outline(t);
+    const ax = Math.max(-halfLen, Math.min(halfLen, ox));
+    for (let k = 0; k <= nv; k++) {
+      const v = -Math.PI / 2 + (k / nv) * Math.PI;
+      const cv = Math.cos(v), sv = Math.sin(v);
+      const f = foilShape(sv, cv, t * perim * pleats, seed);
+      let r = w * Math.pow(cv, 0.92);
+      r += w * (-0.06 * f.near + 0.035 * f.pleat + 0.035 * f.lip);
+      const z = (b * Math.sign(sv) * Math.pow(Math.abs(sv), 0.85) + sv * b * 0.12 * f.pleat) * f.lump;
+      verts.push(ax + dx * r * f.lump, dy * r * f.lump, z);
+    }
+  }
+  for (let j = 0; j < nu; j++) {
+    const j2 = (j + 1) % nu;
+    for (let k = 0; k < nv; k++) {
+      const a0 = j * (nv + 1) + k, a1 = j2 * (nv + 1) + k;
+      idx.push(a0, a1, a0 + 1, a1, a1 + 1, a0 + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  const merged = mergeVertices(geo, 1e-5);
+  merged.computeVertexNormals();
+  return merged;
 }
 
 const face = new THREE.Group();
 scene.add(face);
 
-const smallGeo = inflate(new THREE.TorusGeometry(0.52, 0.2, 64, 160), 0.0035, 14, "z");
-const bigGeo = inflate(new THREE.TorusGeometry(0.88, 0.27, 72, 200), 0.0045, 11, "z");
-const barGeo = inflate(new THREE.CapsuleGeometry(0.13, 0.72, 24, 48), 0.003, 14, "z");
-
-const small = new THREE.Mesh(smallGeo, chrome);
-const big = new THREE.Mesh(bigGeo, chrome);
-big.scale.set(1, 1.14, 1);
-const bar = new THREE.Mesh(barGeo, chrome);
-bar.rotation.z = Math.PI / 2;
+const small = new THREE.Mesh(balloonRing({ rx: 0.52, ry: 0.52, a: 0.21, b: 0.17, pleats: 16, seed: 0.4 }), chrome);
+const big = new THREE.Mesh(balloonRing({ rx: 0.86, ry: 1.0, a: 0.29, b: 0.22, pleats: 22, seed: 2.1 }), chrome);
+const bar = new THREE.Mesh(balloonBar({ halfLen: 0.36, w: 0.13, b: 0.11, pleats: 14, seed: 1.2 }), chrome);
 
 function pivotAt(mesh, x, y, phase) {
   const p = new THREE.Group();
