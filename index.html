@@ -445,5 +445,17 @@ function tick() {
 }
 tick();
 </script>
+<script>
+  // Links that leave *.yeroshen.com open in a new tab; our own pages open in place
+  document.addEventListener("DOMContentLoaded", () => {
+    for (const a of document.querySelectorAll("a[href]")) {
+      const host = new URL(a.href, location.href).hostname;
+      if (host && host !== "yeroshen.com" && !host.endsWith(".yeroshen.com") && host !== location.hostname) {
+        a.target = "_blank";
+        a.rel = "noopener";
+      }
+    }
+  });
+</script>
 </body>
 </html>
