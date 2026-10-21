@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ерошенко Влад — портфолио</title>
+<meta name="description" content="Скоро тут будет что посмотреть">
+<meta name="theme-color" content="#050608">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050608;
+    --blue: #1b58f3;
+    --fg: #ffffff;
+    --muted: rgba(255, 255, 255, 0.6);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background:
+      radial-gradient(120% 75% at 50% 115%, #2a63ff 0%, #1646d6 28%, #0b2167 52%, #060914 76%, var(--bg) 100%),
+      var(--bg);
+    color: var(--fg);
+    font-family: "Google Sans", system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  #scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+  }
+  #scene:active { cursor: grabbing; }
+  .mark {
+    position: fixed;
+    width: 22px;
+    height: 22px;
+    color: var(--blue);
+    pointer-events: none;
+  }
+  .mark.tl { top: 24px; left: 24px; }
+  .mark.tr { top: 24px; right: 24px; }
+  .mark.bl { bottom: 24px; left: 24px; }
+  .mark.br { bottom: 24px; right: 24px; }
+  .fallback {
+    position: fixed;
+    inset: 0;
+    display: none;
+    place-items: center;
+    font-size: clamp(96px, 26vw, 300px);
+    font-weight: 500;
+    color: var(--blue);
+  }
+  .no-webgl .fallback { display: grid; }
+  .caption {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(56px, env(safe-area-inset-bottom));
+    padding: 0 16px;
+    text-align: center;
+    pointer-events: none;
+  }
+  .caption h1 {
+    font-size: clamp(20px, 2.4vw, 28px);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .caption p {
+    margin-top: 6px;
+    font-size: clamp(14px, 1.4vw, 17px);
+    font-weight: 400;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="Трёхмерный смайлик o_O"></canvas>
+<div class="fallback" aria-hidden="true">o_O</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="reg" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.2">
+    <circle cx="11" cy="11" r="5"/>
+    <path d="M1 1 21 21M21 1 1 21"/>
+  </symbol>
+</svg>
+<svg class="mark tl" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark tr" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark bl" aria-hidden="true"><use href="#reg"/></svg>
+<svg class="mark br" aria-hidden="true"><use href="#reg"/></svg>
+
+<div class="caption">
+  <h1>vlad.yeroshen.com</h1>
+  <p>Скоро тут будет что посмотреть</p>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+
+const canvas = document.getElementById("scene");
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+} catch (e) {
+  document.documentElement.classList.add("no-webgl");
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+
+// Studio environment: near-black room, a hard blue floor glow and a set of
+// thin white strips — chrome reads as foil only with high-contrast reflections
+function buildEnvironment() {
+  const env = new THREE.Scene();
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(20, 64, 32),
+    new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`,
+      fragmentShader: `varying vec3 vDir; void main(){
+        float h = vDir.y;
+        vec3 top = vec3(0.01, 0.01, 0.012);
+        vec3 mid = vec3(0.06, 0.062, 0.07);
+        vec3 bot = vec3(0.14, 0.14, 0.15);
+        vec3 c = h > 0. ? mix(mid, top, smoothstep(0., .5, h)) : mix(mid, bot, smoothstep(0.05, .55, -h));
+        gl_FragColor = vec4(c, 1.);
+      }`,
+    })
+  );
+  env.add(dome);
+  const strip = (w, h, x, y, z, intensity) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 1).multiplyScalar(intensity), side: THREE.DoubleSide })
+    );
+    m.position.set(x, y, z);
+    m.lookAt(0, 0, 0);
+    env.add(m);
+  };
+  strip(14, 6, 0, 9, 9, 2.2);     // broad soft key, above-front
+  strip(12, 2.2, -4, 9, 5, 5);    // key, top-left
+  strip(1.2, 10, 9, 1, 5, 4);     // tall rim, right
+  strip(0.6, 10, -9, 0, 6, 2.5);  // thin left strip
+  strip(8, 0.5, 0, 4, 11, 3);     // front top line
+  strip(3, 3, 6, 6, -8, 2);       // back-right
+  strip(2.5, 1.6, 5, 3, 9, 4);    // small window, front-right
+  strip(1.6, 2.4, -6, -2, 8, 3);  // small window, low-left
+  strip(10, 0.35, 0, -3, 9, 2.5); // low horizontal line
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  return pmrem.fromScene(env, 0).texture;
+}
+scene.environment = buildEnvironment();
+
+const chrome = new THREE.MeshPhysicalMaterial({
+  color: 0xd9dade,
+  metalness: 1,
+  roughness: 0.05,
+  envMapIntensity: 1.15,
+});
+
+// --- Foil balloon glyphs ---------------------------------------------------
+// A glyph is rasterised, turned into a signed distance field, and inflated:
+// height grows like a circle profile from the outline inwards, so the edge is
+// a welded seam and the faces are puffy. Pleats ripple near the seam.
+
+const INF = 1e20;
+function edt1d(f, n, d, v, z) {
+  let k = 0;
+  v[0] = 0; z[0] = -INF; z[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) {
+      k--;
+      s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    }
+    k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++;
+    d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+  }
+}
+// Squared Euclidean distance transform (Felzenszwalb & Huttenlocher)
+function edt(grid, w, h) {
+  const n = Math.max(w, h);
+  const f = new Float64Array(n), d = new Float64Array(n);
+  const v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) f[y] = grid[y * w + x];
+    edt1d(f, h, d, v, z);
+    for (let y = 0; y < h; y++) grid[y * w + x] = d[y];
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) f[x] = grid[y * w + x];
+    edt1d(f, w, d, v, z);
+    for (let x = 0; x < w; x++) grid[y * w + x] = d[x];
+  }
+  return grid;
+}
+
+function shapeSDF(w, h, draw, blurPx) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.filter = `blur(${blurPx}px)`;  // rounds the corners like an inflated outline
+  ctx.fillStyle = ctx.strokeStyle = "#fff";
+  draw(ctx, w / 2, h / 2);
+  const alpha = ctx.getImageData(0, 0, w, h).data;
+  const toIn = new Float64Array(w * h), toOut = new Float64Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const inside = alpha[i * 4 + 3] > 127;
+    toIn[i] = inside ? 0 : INF;
+    toOut[i] = inside ? INF : 0;
+  }
+  edt(toIn, w, h); edt(toOut, w, h);
+  const sd = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    sd[i] = toOut[i] > 0 ? Math.sqrt(toOut[i]) - 0.5 : -(Math.sqrt(toIn[i]) - 0.5);
+  }
+  return { sd, w, h };
+}
+
+const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+function balloonShape({ sd, w, h }, { scale, step = 2, seed = 0 }) {
+  const at = (x, y) => {
+    x = Math.max(0, Math.min(w - 1.001, x)); y = Math.max(0, Math.min(h - 1.001, y));
+    const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0;
+    const i = y0 * w + x0;
+    return (sd[i] * (1 - fx) + sd[i + 1] * fx) * (1 - fy) + (sd[i + w] * (1 - fx) + sd[i + w + 1] * fx) * fy;
+  };
+  let maxD = 0;
+  for (let i = 0; i < sd.length; i++) maxD = Math.max(maxD, sd[i]);
+  const D = maxD * 0.92;            // half stroke width, px
+  const puff = 0.95;                // thickness relative to stroke width
+  const pleatK = (Math.PI * 2) / (D * 1.1);
+
+  const nx = Math.ceil(w / step), ny = Math.ceil(h / step);
+  const cols = nx + 1;
+  const sdv = new Float32Array(cols * (ny + 1));
+  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) sdv[j * cols + i] = at(i * step, j * step);
+  const used = new Uint8Array(cols * (ny + 1));
+  const cells = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const a = j * cols + i, b = a + 1, d = a + cols, c = d + 1;
+    if (sdv[a] > 0 || sdv[b] > 0 || sdv[c] > 0 || sdv[d] > 0) {
+      cells.push(a, b, c, d);
+      used[a] = used[b] = used[c] = used[d] = 1;
+    }
+  }
+
+  const front = new Map();
+  const verts = [];
+  const cx = w / 2, cy = h / 2;
+  const px2 = new Float32Array(used.length * 2), sv = new Float32Array(used.length);
+  const hv = new Float32Array(used.length), along = new Float32Array(used.length);
+  for (let k = 0; k < used.length; k++) {
+    if (!used[k]) continue;
+    let x = (k % cols) * step, y = ((k / cols) | 0) * step;
+    let s = sdv[k];
+    let gx = at(x + 1, y) - at(x - 1, y), gy = at(x, y + 1) - at(x, y - 1);
+    const gl = Math.hypot(gx, gy) || 1; gx /= gl; gy /= gl;
+    if (s < 0) { x -= gx * s; y -= gy * s; s = 0; }  // snap onto the outline
+    const t = s / D;
+    px2[k * 2] = x; px2[k * 2 + 1] = y; sv[k] = s;
+    hv[k] = Math.sqrt(Math.max(0, 1 - Math.pow(1 - Math.min(t, 1), 2)));
+    along[k] = (x * -gy + y * gx) * pleatK;
+  }
+  // Relax the height field so the ridge along the stroke's middle becomes a
+  // soft inflated dome instead of a bevel; the seam stays pinned at zero
+  const tmp = new Float32Array(hv.length);
+  for (let it = 0; it < 7; it++) {
+    for (let k = 0; k < hv.length; k++) {
+      if (!used[k] || sv[k] <= 0) { tmp[k] = hv[k]; continue; }
+      let sum = 0, n = 0;
+      for (const nb of [k - 1, k + 1, k - cols, k + cols]) {
+        if (nb >= 0 && nb < hv.length && used[nb]) { sum += hv[nb]; n++; }
+      }
+      tmp[k] = n ? hv[k] * 0.3 + (sum / n) * 0.7 : hv[k];
+    }
+    hv.set(tmp);
+  }
+  for (let k = 0; k < used.length; k++) {
+    if (!used[k]) continue;
+    const t = sv[k] / D;
+    // Sparse sharp creases: short stress lines running in from the seam,
+    // each with its own length and depth, like real foil film
+    const per = along[k] / (Math.PI * 2);
+    const ci = Math.floor(per), local = per - ci;
+    const r1 = hash(ci + seed * 97), r2 = hash(ci * 1.7 + seed * 31);
+    let crease = 0;
+    if (r1 > 0.5) {
+      const len = 0.35 + r2 * 0.6;
+      const across = Math.exp(-Math.pow((local - 0.5) / 0.1, 2));
+      crease = across * (1 - smooth(len * 0.4, len, t)) * (0.5 + 0.5 * r1);
+    }
+    // A shallow groove just inside the outline reads as the welded seam
+    const groove = Math.exp(-Math.pow(t / 0.09, 2)) * 0.18;
+    const zz = D * puff * Math.sqrt(hv[k]) * (1 - 0.16 * crease - groove) * scale;
+    const X = (px2[k * 2] - cx) * scale, Y = -(px2[k * 2 + 1] - cy) * scale;
+    front.set(k, verts.length / 3);
+    verts.push(X, Y, zz);
+  }
+  const frontCount = verts.length / 3;
+  for (let i = 0; i < frontCount; i++) verts.push(verts[i * 3], verts[i * 3 + 1], -verts[i * 3 + 2]);
+
+  const idx = [];
+  for (let q = 0; q < cells.length; q += 4) {
+    const a = front.get(cells[q]), b = front.get(cells[q + 1]), c = front.get(cells[q + 2]), d = front.get(cells[q + 3]);
+    idx.push(a, d, b, b, d, c);
+    idx.push(a + frontCount, b + frontCount, d + frontCount, b + frontCount, c + frontCount, d + frontCount);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geo.setIndex(idx);
+  const merged = mergeVertices(geo, 1e-5);
+  merged.computeVertexNormals();
+  merged.computeBoundingBox();
+  return merged;
+}
+
+// The o_O logo from o_O.svg (viewBox 768×431), rasterised at K px per unit
+const LOGO = {
+  big: "M593.072 354.378C567.85 354.378 544.544 350.068 523.154 341.448C501.764 332.509 483.247 320.217 467.603 304.573C452.278 288.61 440.147 269.934 431.207 248.543C422.587 226.834 418.277 203.049 418.277 177.189C418.277 151.329 422.587 127.704 431.207 106.313C440.147 84.6037 452.278 65.927 467.603 50.2834C483.247 34.3204 501.764 22.0289 523.154 13.4089C544.544 4.46964 567.85 0 593.072 0C618.293 0 641.44 4.46964 662.511 13.4089C683.901 22.0289 702.418 34.3204 718.062 50.2834C733.706 65.927 745.837 84.6037 754.457 106.313C763.397 127.704 767.866 151.329 767.866 177.189C767.866 203.049 763.397 226.834 754.457 248.543C745.837 269.934 733.706 288.61 718.062 304.573C702.418 320.217 683.901 332.509 662.511 341.448C641.44 350.068 618.293 354.378 593.072 354.378ZM593.072 313.672C612.227 313.672 629.787 310.48 645.75 304.094C662.032 297.39 675.92 288.132 687.413 276.319C699.226 264.187 708.324 249.82 714.71 233.219C721.414 216.298 724.766 197.621 724.766 177.189C724.766 156.756 721.414 138.239 714.71 121.638C708.324 104.717 699.226 90.3504 687.413 78.5378C675.92 66.4059 662.032 57.1474 645.75 50.7622C629.787 44.0578 612.227 40.7055 593.072 40.7055C573.916 40.7055 556.197 44.0578 539.915 50.7622C523.952 57.1474 510.064 66.4059 498.252 78.5378C486.758 90.3504 477.66 104.717 470.955 121.638C464.57 138.239 461.377 156.756 461.377 177.189C461.377 197.621 464.57 216.298 470.955 233.219C477.66 249.82 486.758 264.187 498.252 276.319C510.064 288.132 523.952 297.39 539.915 304.094C556.197 310.48 573.916 313.672 593.072 313.672Z",
+  bar: "M258.413 395.083H430.813V431H258.413V395.083Z",
+  small: "M124.511 349.589C106.633 349.589 90.0311 346.556 74.7067 340.49C59.3822 334.105 46.133 325.485 34.9589 314.63C24.1041 303.456 15.4841 290.207 9.09889 274.882C3.03296 259.558 0 242.956 0 225.078C0 207.199 3.03296 190.598 9.09889 175.273C15.4841 159.949 24.1041 146.859 34.9589 136.004C46.133 124.83 59.3822 116.21 74.7067 110.144C90.0311 103.759 106.633 100.567 124.511 100.567C142.39 100.567 158.991 103.759 174.316 110.144C189.64 116.21 202.73 124.83 213.584 136.004C224.759 146.859 233.379 159.949 239.444 175.273C245.83 190.598 249.022 207.199 249.022 225.078C249.022 242.956 245.83 259.558 239.444 274.882C233.379 290.207 224.759 303.456 213.584 314.63C202.73 325.485 189.64 334.105 174.316 340.49C158.991 346.556 142.39 349.589 124.511 349.589ZM124.511 313.672C136.962 313.672 148.456 311.597 158.991 307.447C169.527 302.977 178.626 296.911 186.288 289.249C193.95 281.267 199.856 271.849 204.007 260.994C208.476 250.14 210.711 238.167 210.711 225.078C210.711 211.988 208.476 200.016 204.007 189.161C199.856 178.306 193.95 169.048 186.288 161.386C178.626 153.404 169.527 147.338 158.991 143.188C148.456 138.718 136.962 136.483 124.511 136.483C112.06 136.483 100.567 138.718 90.0311 143.188C79.4956 147.338 70.3967 153.404 62.7344 161.386C55.0722 169.048 49.0063 178.306 44.5367 189.161C40.3863 200.016 38.3111 211.988 38.3111 225.078C38.3111 238.167 40.3863 250.14 44.5367 260.994C49.0063 271.849 55.0722 281.267 62.7344 289.249C70.3967 296.911 79.4956 302.977 90.0311 307.447C100.567 311.597 112.06 313.672 124.511 313.672Z",
+};
+const K = 1.3;
+const U = 0.0071;                   // world units per logo unit
+// Centre of each part's bounding box and its size, in logo units
+const parts = {
+  small: { at: [124.5, 225], size: [249, 249], grow: 30 },
+  bar:   { at: [344.6, 413], size: [172.4, 36], grow: 26 },
+  big:   { at: [593, 177.2], size: [349.6, 354.4], grow: 34 },
+};
+const PAD = 40;
+
+const face = new THREE.Group();
+scene.add(face);
+const pivots = {};
+Object.entries(parts).forEach(([name, p], i) => {
+  const path = new Path2D(LOGO[name]);
+  const w = Math.round((p.size[0] + PAD * 2) * K), h = Math.round((p.size[1] + PAD * 2) * K);
+  const sdf = shapeSDF(w, h, (c, x, y) => {
+    c.translate(x - p.at[0] * K, y - p.at[1] * K);
+    c.scale(K, K);
+    c.fill(path);
+    // Thicken the eye rings: stroking the outline grows it evenly on both sides
+    if (p.grow) { c.lineWidth = p.grow; c.lineJoin = "round"; c.stroke(path); }
+  }, 5);
+  const mesh = new THREE.Mesh(balloonShape(sdf, { scale: U / K, seed: i * 1.7 }), chrome);
+  const pivot = new THREE.Group();
+  pivot.add(mesh);
+  pivot.position.set((p.at[0] - 384) * U, -(p.at[1] - 215.5) * U, 0);
+  pivot.userData = { baseY: pivot.position.y, phase: i * 1.3 };
+  face.add(pivot);
+  pivots[name] = pivot;
+});
+const faceWidth = 768 * U;
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const fitWidth = (faceWidth + 1.2) / (2 * tanHalf * camera.aspect);
+  camera.position.set(0, 0.15, Math.max(8.6, fitWidth));
+  camera.lookAt(0, -0.35, 0);
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Pointer: face looks at the cursor; drag spins it; click makes the big eye pop
+const target = new THREE.Vector2();
+let dragging = false, lastX = 0, spin = 0, spinVel = 0, surprise = 0;
+canvas.addEventListener("pointermove", (e) => {
+  target.x = (e.clientX / window.innerWidth) * 2 - 1;
+  target.y = (e.clientY / window.innerHeight) * 2 - 1;
+  if (dragging) {
+    spinVel = (e.clientX - lastX) * 0.01;
+    spin += spinVel;
+    lastX = e.clientX;
+  }
+});
+canvas.addEventListener("pointerdown", (e) => {
+  dragging = true;
+  lastX = e.clientX;
+  canvas.setPointerCapture(e.pointerId);
+  surprise = 1;
+});
+canvas.addEventListener("pointerup", () => { dragging = false; });
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const amp = reduceMotion ? 0 : 1;
+
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  if (!dragging) {
+    spinVel *= 0.94;
+    spin += spinVel;
+    spin *= 0.97;
+  }
+  face.rotation.y += (target.x * 0.45 + spin - face.rotation.y) * 0.08;
+  face.rotation.x += (target.y * 0.25 - face.rotation.x) * 0.08;
+
+  surprise = Math.max(0, surprise - dt * 1.8);
+  const pop = 1 + Math.sin(surprise * Math.PI) * 0.16;
+
+  for (const p of face.children) {
+    p.position.y = p.userData.baseY + Math.sin(t * 1.3 + p.userData.phase) * 0.05 * amp;
+    p.rotation.y = Math.sin(t * 0.55 + p.userData.phase * 2) * 0.12 * amp;
+  }
+  pivots.big.scale.set(pop, pop, pop);
+  pivots.small.rotation.z = Math.sin(t * 0.9) * 0.06 * amp;
+  pivots.big.rotation.z = Math.sin(t * 0.7 + 1) * 0.05 * amp;
+  pivots.bar.rotation.z = Math.sin(t * 1.1 + 2) * 0.05 * amp;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+<script>
+  // Links that leave *.yeroshen.com open in a new tab; our own pages open in place
+  document.addEventListener("DOMContentLoaded", () => {
+    for (const a of document.querySelectorAll("a[href]")) {
+      const host = new URL(a.href, location.href).hostname;
+      if (host && host !== "yeroshen.com" && !host.endsWith(".yeroshen.com") && host !== location.hostname) {
+        a.target = "_blank";
+        a.rel = "noopener";
+      }
+    }
+  });
+</script>
+</body>
+</html>
