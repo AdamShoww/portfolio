@@ -111,7 +111,7 @@
   }
   .cta:hover, .cta:focus-visible { filter: brightness(1.08); }
   /* Same size as the CTA, white outline instead of the fill */
-  .cta-ghost { background: transparent; box-shadow: inset 0 0 0 1px #f5f4ef; transition: background-color 0.2s; }
+  .cta-ghost { background: transparent; box-shadow: inset 0 0 0 1px #f5f4ef; transition: background-color 0.2s; will-change: transform; }
   .cta-ghost:hover, .cta-ghost:focus-visible { filter: none; background: rgba(245, 244, 239, 0.08); }
   .arrow { width: 10px; height: 10px; flex: none; }
   /* With JS the CTA becomes glossy orange glass: a hairline rim lit at two
@@ -205,8 +205,8 @@
   // towards a nearby cursor. The glass itself never changes shape: only
   // position and a tilt in perspective.
   // Works with a mouse and with a finger; the hover effects need a mouse.
-  (function () {
-    const glass = document.querySelector(".cta-main");
+  // Both buttons float, each on its own phase; only the CTA gets the lit rim.
+  function floatButton(glass, phase, lit) {
     const still = matchMedia("(prefers-reduced-motion: reduce)");
     const BASE = 0;
     const MAGNET = 275;         // cursor distance at which the glass starts to lean
@@ -226,7 +226,7 @@
     function frame(now) {
       const dt = Math.min((now - (last || now)) / 1000, 1 / 30) || 1 / 60;
       last = now;
-      const t = (now - t0) / 1000;
+      const t = (now - t0) / 1000 + phase;
       const calm = still.matches;
       // The magnetic lean eases in rather than jumping with every mouse event
       const ease = 1 - Math.exp(-dt * 2.2);
@@ -285,13 +285,15 @@
     }
 
     function setup() {
-      glass.classList.add("is-glass");
+      if (lit) glass.classList.add("is-glass");
       raf = requestAnimationFrame(frame);
     }
     addEventListener("pointermove", hover, { passive: true });
     document.addEventListener("pointerleave", () => { leanTo = { x: 0, y: 0 }; hoverTilt = { x: 0, y: 0 }; glowTo = REST_GLOW; });
     setup();
-  })();
+  }
+  floatButton(document.querySelector(".cta-ghost"), 2.7, false);
+  floatButton(document.querySelector(".cta-main"), 0, true);
 </script>
 
 <script type="importmap">
