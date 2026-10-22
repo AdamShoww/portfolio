@@ -87,7 +87,9 @@
     right: 0;
     bottom: max(48px, env(safe-area-inset-bottom));
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
+    gap: 16px;
     padding: 0 16px;
     pointer-events: none;
   }
@@ -108,6 +110,9 @@
     transition: filter 0.2s;
   }
   .cta:hover, .cta:focus-visible { filter: brightness(1.08); }
+  /* Same size as the CTA, white outline instead of the fill */
+  .cta-ghost { background: transparent; box-shadow: inset 0 0 0 1px #f5f4ef; transition: background-color 0.2s; }
+  .cta-ghost:hover, .cta-ghost:focus-visible { filter: none; background: rgba(245, 244, 239, 0.08); }
   .arrow { width: 10px; height: 10px; flex: none; }
   /* With JS the CTA becomes glossy orange glass: a hairline rim lit at two
      corners, light that turns towards the cursor, a 3D tilt and a light
@@ -190,7 +195,9 @@
 </div>
 
 <div class="cta-slot">
-  <a class="cta" href="https://t.me/adam_showw" target="_blank" rel="noopener">Обсудить проект
+  <a class="cta cta-ghost" href="https://yeroshen.com/">Вернуться на сайт
+    <svg class="arrow" viewBox="0 0 11.2803 11.2803" fill="none" aria-hidden="true"><path d="M0.53033 10.75L10.5303 0.75M10.5303 10.75V0.75H0.53033" stroke-width="1.5" stroke="currentColor"/></svg></a>
+  <a class="cta cta-main" href="https://t.me/adam_showw" target="_blank" rel="noopener">Обсудить проект
     <svg class="arrow" viewBox="0 0 11.2803 11.2803" fill="none" aria-hidden="true"><path d="M0.53033 10.75L10.5303 0.75M10.5303 10.75V0.75H0.53033" stroke-width="1.5" stroke="currentColor"/></svg></a>
 </div>
 <script>
@@ -199,7 +206,7 @@
   // position and a tilt in perspective.
   // Works with a mouse and with a finger; the hover effects need a mouse.
   (function () {
-    const glass = document.querySelector(".cta");
+    const glass = document.querySelector(".cta-main");
     const still = matchMedia("(prefers-reduced-motion: reduce)");
     const BASE = 0;
     const MAGNET = 275;         // cursor distance at which the glass starts to lean
