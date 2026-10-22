@@ -19,6 +19,7 @@
     --blue: #1b58f3;
     --fg: #ffffff;
     --muted: rgba(255, 255, 255, 0.6);
+    --orange: #eb623f;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -66,10 +67,99 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: max(56px, env(safe-area-inset-bottom));
+    top: max(56px, env(safe-area-inset-top));
     padding: 0 16px;
     text-align: center;
     pointer-events: none;
+  }
+  .caption a {
+    color: inherit;
+    text-decoration: none;
+    pointer-events: auto;
+    transition: opacity 0.2s;
+  }
+  .caption a:hover, .caption a:focus-visible { opacity: 0.75; }
+
+  /* The CTA from the home page (yeroshen.com), centred at the bottom */
+  .cta-slot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(48px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    padding: 0 16px;
+    pointer-events: none;
+  }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 36px;
+    height: 72px;
+    padding: 0 48px;
+    border-radius: 48px;
+    background: var(--orange);
+    color: #f5f4ef;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 20px;
+    text-decoration: none;
+    pointer-events: auto;
+    transition: filter 0.2s;
+  }
+  .cta:hover, .cta:focus-visible { filter: brightness(1.08); }
+  /* Same size as the CTA, white outline instead of the fill */
+  .cta-ghost { background: transparent; box-shadow: inset 0 0 0 1px #f5f4ef; transition: background-color 0.2s; will-change: transform; }
+  .cta-ghost:hover, .cta-ghost:focus-visible { filter: none; background: rgba(245, 244, 239, 0.08); }
+  .arrow { width: 10px; height: 10px; flex: none; }
+  /* With JS the CTA becomes glossy orange glass: a hairline rim lit at two
+     corners, light that turns towards the cursor, a 3D tilt and a light
+     magnetic pull. The fill stays solid: over the empty dark page a see-through
+     glass only muddies the colour. .is-glass is added by the script; without
+     JS the plain orange button stays. */
+  @media screen {
+    .cta.is-glass {
+      position: relative;
+      isolation: isolate;           /* the rim sits under the label */
+      --pink: 236, 72, 255;
+      --gold: 255, 214, 74;
+      background: var(--orange);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        inset 0 -8px 18px rgba(120, 30, 10, 0.25);
+      text-shadow: 0 1px 6px rgba(120, 30, 10, 0.3);
+      will-change: transform;
+    }
+    .cta.is-glass::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+    /* The rim: a hairline that burns pink at one corner and gold at the
+       opposite one, fading to faint glass in between. --ga turns it. */
+    .cta.is-glass::after {
+      padding: 1px;
+      opacity: 0.48;
+      filter: blur(0.4px);
+      background: conic-gradient(from var(--ga, 45deg),
+        rgb(var(--pink)) 0deg, rgba(var(--pink), 0.35) 40deg,
+        rgba(255, 255, 255, 0.1) 80deg, rgba(255, 255, 255, 0.1) 140deg,
+        rgba(var(--gold), 0.35) 150deg, rgb(var(--gold)) 180deg, rgba(var(--gold), 0.35) 220deg,
+        rgba(255, 255, 255, 0.1) 260deg, rgba(255, 255, 255, 0.1) 320deg,
+        rgba(var(--pink), 0.35) 330deg, rgb(var(--pink)) 360deg);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+    .cta.is-glass:hover, .cta.is-glass:focus-visible { filter: none; }
+  }
+  @media (max-width: 760px) {
+    .cta { height: 60px; padding: 0 32px; gap: 24px; }
   }
   .caption h1 {
     font-size: clamp(20px, 2.4vw, 28px);
@@ -100,9 +190,111 @@
 <svg class="mark br" aria-hidden="true"><use href="#reg"/></svg>
 
 <div class="caption">
-  <h1>vlad.yeroshen.com</h1>
+  <h1><a href="https://vlad.yeroshen.com/">vlad.yeroshen.com</a></h1>
   <p>Скоро тут будет что посмотреть</p>
 </div>
+
+<div class="cta-slot">
+  <a class="cta cta-ghost" href="https://yeroshen.com/">Вернуться на сайт
+    <svg class="arrow" viewBox="0 0 11.2803 11.2803" fill="none" aria-hidden="true"><path d="M0.53033 10.75L10.5303 0.75M10.5303 10.75V0.75H0.53033" stroke-width="1.5" stroke="currentColor"/></svg></a>
+  <a class="cta cta-main" href="https://t.me/adam_showw" target="_blank" rel="noopener">Обсудить проект
+    <svg class="arrow" viewBox="0 0 11.2803 11.2803" fill="none" aria-hidden="true"><path d="M0.53033 10.75L10.5303 0.75M10.5303 10.75V0.75H0.53033" stroke-width="1.5" stroke="currentColor"/></svg></a>
+</div>
+<script>
+  // Glass CTA: a slow drifting float, and a light magnetic lean and 3D tilt
+  // towards a nearby cursor. The glass itself never changes shape: only
+  // position and a tilt in perspective.
+  // Works with a mouse and with a finger; the hover effects need a mouse.
+  // Both buttons float, each on its own phase; only the CTA gets the lit rim.
+  function floatButton(glass, phase, lit) {
+    const still = matchMedia("(prefers-reduced-motion: reduce)");
+    const BASE = 0;
+    const MAGNET = 275;         // cursor distance at which the glass starts to lean
+    let pos = { x: 0, y: 0 }, vel = { x: 0, y: 0 }, lean = { x: 0, y: 0 }, leanTo = { x: 0, y: 0 };
+    let rx = 0, rxVel = 0, ry = 0, ryVel = 0, hoverTilt = { x: 0, y: 0 }, sway = 1;
+    const REST_GLOW = Math.PI / 4;   // pink corner top-right, gold bottom-left
+    let glow = REST_GLOW, glowTo = REST_GLOW;
+    let raf = 0, last = 0, t0 = performance.now();
+
+    // Damped spring step: stiffness from the angular frequency w, damping ratio z
+    function spring(x, v, target, w, z, dt) {
+      const a = -w * w * (x - target) - 2 * z * w * v;
+      v += a * dt;
+      return [x + v * dt, v];
+    }
+
+    function frame(now) {
+      const dt = Math.min((now - (last || now)) / 1000, 1 / 30) || 1 / 60;
+      last = now;
+      const t = (now - t0) / 1000 + phase;
+      const calm = still.matches;
+      // The magnetic lean eases in rather than jumping with every mouse event
+      const ease = 1 - Math.exp(-dt * 2.2);
+      lean.x += (leanTo.x - lean.x) * ease;
+      lean.y += (leanTo.y - lean.y) * ease;
+
+      const z = calm ? 1 : 0.75;
+      [pos.x, vel.x] = spring(pos.x, vel.x, lean.x, 7, z, dt);
+      [pos.y, vel.y] = spring(pos.y, vel.y, lean.y, 7, z, dt);
+
+      // 3D tilt: towards the cursor at rest, into the motion while moving.
+      // A critically damped spring, so it settles without wobbling.
+      const clamp = (v) => Math.max(-12, Math.min(12, v));
+      const ryTo = clamp(hoverTilt.y + vel.x * 0.006);
+      const rxTo = clamp(hoverTilt.x - vel.y * 0.006);
+      [ry, ryVel] = spring(ry, ryVel, ryTo, 6, 1, dt);
+      [rx, rxVel] = spring(rx, rxVel, rxTo, 6, 1, dt);
+      const speed = Math.hypot(vel.x, vel.y);
+
+      // The drift fades out while held and back in once the glass has settled
+      const settled = speed < 40 && Math.hypot(pos.x - lean.x, pos.y - lean.y) < 6;
+      sway += ((settled && !calm ? 1 : 0) - sway) * (1 - Math.exp(-dt * (settled ? 0.9 : 6)));
+      const fx = Math.sin(t * 0.36 + 0.5) * 1.6 * sway;
+      const fy = (Math.sin(t * 0.8) * 2.6 + Math.sin(t * 0.47 + 1.3) * 1.4) * sway;
+      const fr = (Math.sin(t * 0.6 + 1) * 0.45 + Math.sin(t * 0.29) * 0.25) * sway;
+
+      glass.style.transform =
+        `perspective(900px) translate(${pos.x + fx}px, ${pos.y + fy}px) ` +
+        `rotate(${BASE + fr}deg) rotateX(${rx}deg) rotateY(${ry}deg)`;
+
+      // Turn the lit corners towards the cursor (or, at rest, back to top-right),
+      // the short way round
+      const turn = Math.atan2(Math.sin(glowTo - glow), Math.cos(glowTo - glow));
+      glow += turn * (1 - Math.exp(-dt * 2));
+      glass.style.setProperty("--ga", `${glow * 180 / Math.PI}deg`);
+      raf = requestAnimationFrame(frame);
+    }
+
+    // Magnetic hover: a nearby cursor pulls the resting glass a few pixels towards it
+    function hover(e) {
+      if (e.pointerType !== "mouse" || still.matches) return;
+      const r = glass.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+      const d = Math.hypot(dx, dy) - r.width / 2;
+      const pull = d < MAGNET ? (1 - Math.max(d, 0) / MAGNET) * 0.042 : 0;
+      // CSS angle: 0 points up, clockwise. The pill is wide, so squash the
+      // horizontal distance a little or the light would hug the short ends.
+      glowTo = d < MAGNET * 2 ? Math.atan2(dx * 0.45, -dy) : REST_GLOW;
+      leanTo = { x: Math.max(-8.3, Math.min(8.3, dx * pull)), y: Math.max(-5.5, Math.min(5.5, dy * pull)) };
+      // Turn the face towards the cursor, as if the glass were looking at it
+      const near = d < MAGNET ? 1 - Math.max(d, 0) / MAGNET : 0;
+      hoverTilt = {
+        x: -Math.max(-1, Math.min(1, dy / r.height)) * 8 * near,
+        y: Math.max(-1, Math.min(1, dx / (r.width / 2))) * 8 * near,
+      };
+    }
+
+    function setup() {
+      if (lit) glass.classList.add("is-glass");
+      raf = requestAnimationFrame(frame);
+    }
+    addEventListener("pointermove", hover, { passive: true });
+    document.addEventListener("pointerleave", () => { leanTo = { x: 0, y: 0 }; hoverTilt = { x: 0, y: 0 }; glowTo = REST_GLOW; });
+    setup();
+  }
+  floatButton(document.querySelector(".cta-ghost"), 2.7, false);
+  floatButton(document.querySelector(".cta-main"), 0, true);
+</script>
 
 <script type="importmap">
 { "imports": {
