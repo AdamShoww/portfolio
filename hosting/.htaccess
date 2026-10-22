@@ -1,0 +1,31 @@
+# Apache settings for the reg.ru hosting. The deploy workflow copies this file
+# to the site root; GitHub Pages ignores it.
+
+DirectoryIndex index.html
+
+# No folder listings
+Options -Indexes
+
+# Never serve dot files (.htaccess, .git leftovers) or editor backups
+<FilesMatch "^\.|~$|\.(bak|old|orig|swp|log)$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  # The browser must not guess file types or render the site inside someone else's frame
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+
+  # Only our own files, Google Fonts and three.js from jsDelivr. Inline scripts and styles are part of
+  # the generated pages, hence 'unsafe-inline'; nothing else may run or load.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests"
+
+  # HSTS (HTTPS only) goes in once the Let's Encrypt certificate is live:
+  # Header always set Strict-Transport-Security "max-age=15552000"
+
+  # No version banners
+  Header always unset X-Powered-By
+</IfModule>

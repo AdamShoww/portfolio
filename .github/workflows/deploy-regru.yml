@@ -1,0 +1,88 @@
+name: Deploy to reg.ru hosting
+
+# Mirrors vlad.yeroshen.com to the reg.ru hosting over FTP after every push to main.
+# GitHub Pages keeps building as before: pointing the DNS record back to
+# adamshoww.github.io undoes the move.
+#
+# Needs repository secrets: FTP_HOST, FTP_USER, FTP_PASSWORD and FTP_DIR (the
+# site's folder on the hosting, e.g. www/vlad.yeroshen.com). Without them the job
+# is skipped.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-regru
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FTP_HOST: ${{ secrets.FTP_HOST }}
+      FTP_USER: ${{ secrets.FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      FTP_DIR: ${{ secrets.FTP_DIR }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$FTP_HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ] || [ -z "$FTP_DIR" ]; then
+            echo "FTP secrets are not set yet, skipping"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+
+      - name: Prepare the site folder
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          mkdir -p _site
+          rsync -a --exclude .git --exclude .github --exclude hosting \
+            --exclude CNAME --exclude .nojekyll --exclude .gitignore ./ _site/
+          # Apache settings for the hosting: 404 page, security headers
+          cp hosting/.htaccess _site/.htaccess
+
+      - name: Upload over FTP
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          sudo apt-get install -y -qq lftp > /dev/null
+          # No --delete: a mistyped FTP_DIR must never wipe other files on the hosting.
+          # FTP_DIR goes in unquoted: lftp would keep the quotes as part of the name.
+          lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" -e "
+            set ftp:ssl-force yes;
+            set ftp:ssl-protect-data yes;
+            set net:max-retries 2;
+            set net:timeout 30;
+            mirror --reverse --parallel=4 --verbose=1 _site/ $FTP_DIR;
+            bye"
+
+      - name: Check the live site
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          # Seen from GitHub's servers, outside Russia. A broken .htaccess shows
+          # up as 500: then a minimal one goes back so the site stays up.
+          # The certificate is reported, not enforced: -k keeps the page checks going
+          echo | openssl s_client -connect vlad.yeroshen.com:443 -servername vlad.yeroshen.com -showcerts 2>/dev/null \
+            | grep -E '^ *[0-9] s:|^ *i:|Verify return code' || true
+          echo "certificate check by curl → $(curl -s -o /dev/null -w '%{ssl_verify_result}' --max-time 30 https://vlad.yeroshen.com/ || echo failed)"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 https://vlad.yeroshen.com/ || true)
+          echo "https://vlad.yeroshen.com/ → $code"
+          curl -skI --max-time 30 https://vlad.yeroshen.com/ | grep -iE '^(HTTP|content-security|strict-transport|x-frame|x-content|referrer|permissions|server)' || true
+          echo "404 page → $(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 https://vlad.yeroshen.com/no-such-page/ || true)"
+          echo ".htaccess → $(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 https://vlad.yeroshen.com/.htaccess || true)"
+          echo "http → $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30 http://vlad.yeroshen.com/ || true)"
+          if [ "$code" != "200" ]; then
+            printf 'DirectoryIndex index.html\n' > fallback.htaccess
+            lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" -e "
+              set ftp:ssl-force yes;
+              put fallback.htaccess -o $FTP_DIR/.htaccess;
+              bye"
+            echo "Site was not 200: restored a minimal .htaccess"
+            exit 1
+          fi
