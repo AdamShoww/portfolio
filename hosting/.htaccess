@@ -23,8 +23,8 @@ Options -Indexes
   # the generated pages, hence 'unsafe-inline'; nothing else may run or load.
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests"
 
-  # HSTS (HTTPS only) goes in once the Let's Encrypt certificate is live:
-  # Header always set Strict-Transport-Security "max-age=15552000"
+  # HTTPS only for six months (Let's Encrypt via Ispmanager)
+  Header always set Strict-Transport-Security "max-age=15552000"
 
   # No version banners
   Header always unset X-Powered-By
