@@ -12,16 +12,17 @@ Options -Indexes
 </FilesMatch>
 
 <IfModule mod_headers.c>
-  # The browser must not guess file types or render the site inside someone else's frame
+  # The browser must not guess file types. Framing is limited by frame-ancestors below:
+  # only Yandex Metrika may show the site (click map, Webvisor)
   Header always set X-Content-Type-Options "nosniff"
-  Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
   Header always set Cross-Origin-Opener-Policy "same-origin"
 
   # Only our own files, Google Fonts and three.js from jsDelivr. Inline scripts and styles are part of
   # the generated pages, hence 'unsafe-inline'; nothing else may run or load.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net; media-src 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests"
+  # Yandex Metrika (assets/metrika.js): its script, beacons, Webvisor frames
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://mc.yandex.ru https://yastatic.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com; connect-src 'self' https://cdn.jsdelivr.net https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com; media-src 'self'; object-src 'none'; frame-src blob: https://mc.yandex.ru https://mc.yandex.com; frame-ancestors 'self' https://metrika.yandex.ru https://metrika.yandex.by https://metrica.yandex.com https://*.webvisor.com; base-uri 'self'; form-action 'none'; upgrade-insecure-requests; child-src blob: https://mc.yandex.ru https://mc.yandex.com"
 
   # HTTPS only for six months (Let's Encrypt via Ispmanager)
   Header always set Strict-Transport-Security "max-age=15552000"
