@@ -19,10 +19,10 @@ Options -Indexes
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
   Header always set Cross-Origin-Opener-Policy "same-origin"
 
-  # Only our own files, Google Fonts and three.js from jsDelivr. Inline scripts and styles are part of
+  # Only our own files (fonts and three.js are served from the site itself) and Yandex Metrika.
   # the generated pages, hence 'unsafe-inline'; nothing else may run or load.
   # Yandex Metrika (assets/metrika.js): its script, beacons, Webvisor frames
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://mc.yandex.ru https://yastatic.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com; connect-src 'self' https://cdn.jsdelivr.net https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com; media-src 'self'; object-src 'none'; frame-src blob: https://mc.yandex.ru https://mc.yandex.com; frame-ancestors 'self' https://metrika.yandex.ru https://metrika.yandex.by https://metrica.yandex.com https://*.webvisor.com; base-uri 'self'; form-action 'none'; upgrade-insecure-requests; child-src blob: https://mc.yandex.ru https://mc.yandex.com"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://mc.yandex.ru https://yastatic.net; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://mc.yandex.ru https://mc.yandex.com; connect-src 'self' https://mc.yandex.ru https://mc.yandex.com wss://mc.yandex.ru wss://mc.yandex.com; media-src 'self'; object-src 'none'; frame-src blob: https://mc.yandex.ru https://mc.yandex.com; frame-ancestors 'self' https://metrika.yandex.ru https://metrika.yandex.by https://metrica.yandex.com https://*.webvisor.com; base-uri 'self'; form-action 'none'; upgrade-insecure-requests; child-src blob: https://mc.yandex.ru https://mc.yandex.com"
 
   # HTTPS only for six months (Let's Encrypt via Ispmanager)
   Header always set Strict-Transport-Security "max-age=15552000"
